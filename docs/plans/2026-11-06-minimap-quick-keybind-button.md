@@ -116,7 +116,7 @@ Answers to the three design questions:
     Visual: rebind → Esc → binding kept; Okay path also still works (Blizzard's own
     `KeybindListener:Commit` is idempotent re-save).
 
-- [ ] T6: Left-click opens the Keybindings settings panel; `/qbk`
+- [x] T6: Left-click opens the Keybindings settings panel; `/qbk`
   - files: `QuickBinds/Core.lua` (`OpenKeybindSettings`), `QuickBinds/MinimapButton.lua`
     (OnClick left branch, tooltip line)
   - change: refuse in combat with a message; demand-load `Blizzard_Settings` **and**

@@ -6,6 +6,12 @@ QuickBinds = {
 
 local MSG_COMBAT = "Quick Binds: keybindings are protected in combat.";
 local MSG_NO_MODE = "Quick Binds: Quick Keybind Mode is not available on this client.";
+local MSG_NO_PANEL = "Quick Binds: the Keybindings panel is not available here - use Esc > Keybindings.";
+
+local function LoadOnDemand(name)
+    local load = (C_AddOns and C_AddOns.LoadAddOn) or LoadAddOn;
+    return load(name);
+end
 
 -- Enter Blizzard's Quick Keybind Mode. The mode lives in the LoadOnDemand addon
 -- Blizzard_QuickKeybind; ShowUIPanel(QuickKeybindFrame) is the entry point (its own
@@ -15,8 +21,7 @@ function QuickBinds.EnterQuickKeybindMode()
         DEFAULT_CHAT_FRAME:AddMessage(MSG_COMBAT);
         return;
     end
-    local load = (C_AddOns and C_AddOns.LoadAddOn) or LoadAddOn;
-    local loaded = load("Blizzard_QuickKeybind");
+    local loaded = LoadOnDemand("Blizzard_QuickKeybind");
     if not loaded then
         DEFAULT_CHAT_FRAME:AddMessage(MSG_NO_MODE);
         return;
@@ -24,9 +29,35 @@ function QuickBinds.EnterQuickKeybindMode()
     ShowUIPanel(QuickKeybindFrame);
 end
 
+-- Open the Esc > Keybindings settings panel. Settings.KEYBINDINGS_CATEGORY_ID is set
+-- by Blizzard_SettingsDefinitions_Frame (Keybindings.lua:282), which Blizzard_Settings
+-- does NOT depend on, so both addons must be demanded. If the client doesn't hand the
+-- panel over, print one chat line - never a Lua error (accepted fallback).
+function QuickBinds.OpenKeybindSettings()
+    if InCombatLockdown() then
+        DEFAULT_CHAT_FRAME:AddMessage(MSG_COMBAT);
+        return;
+    end
+    LoadOnDemand("Blizzard_Settings");
+    LoadOnDemand("Blizzard_SettingsDefinitions_Frame");
+    local categoryID = Settings and Settings.KEYBINDINGS_CATEGORY_ID;
+    if not categoryID then
+        DEFAULT_CHAT_FRAME:AddMessage(MSG_NO_PANEL);
+        return;
+    end
+    if not pcall(Settings.OpenToCategory, categoryID) then
+        DEFAULT_CHAT_FRAME:AddMessage(MSG_NO_PANEL);
+    end
+end
+
 SLASH_QUICKBIND1 = "/qb";
 SlashCmdList["QUICKBIND"] = function()
     QuickBinds.EnterQuickKeybindMode();
+end;
+
+SLASH_QUICKBINDK1 = "/qbk";
+SlashCmdList["QUICKBINDK"] = function()
+    QuickBinds.OpenKeybindSettings();
 end;
 
 -- Binding persistence. Quick Keybind Mode applies SetBinding immediately in memory,

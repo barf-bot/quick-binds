@@ -68,6 +68,8 @@ local function CreateButton()
     button:SetScript("OnClick", function(self, buttonName)
         if buttonName == "RightButton" then
             QuickBinds.EnterQuickKeybindMode();
+        elseif buttonName == "LeftButton" then
+            QuickBinds.OpenKeybindSettings();
         end
     end);
 
@@ -75,6 +77,7 @@ local function CreateButton()
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
         GameTooltip:SetText("Quick Binds", 1, 1, 1);
         GameTooltip:AddLine("Right-click: Quick Keybind Mode");
+        GameTooltip:AddLine("Left-click: Keybindings panel");
         GameTooltip:Show();
     end);
     button:SetScript("OnLeave", function()
