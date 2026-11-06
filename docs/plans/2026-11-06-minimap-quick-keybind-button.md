@@ -68,7 +68,7 @@ Answers to the three design questions:
     name to the list makes it exit non-zero.
   - test: `node tools/check-apis.mjs` (new), plus the bogus-name failure probe (reverted after).
 
-- [ ] T3: Draggable minimap button with persisted position and `/qbcenter`
+- [x] T3: Draggable minimap button with persisted position and `/qbcenter`
   - files: `QuickBinds/MinimapButton.lua`
   - change: plain circular 32px `CreateFrame("Button")` parented to `Minimap` with own
     backdrop + "KB" text (no external libs — `C_Minimap` has no RegisterMinimapButton in this
