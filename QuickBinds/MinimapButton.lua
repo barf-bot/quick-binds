@@ -64,11 +64,17 @@ local function CreateButton()
     label:SetPoint("CENTER");
     label:SetText("KB");
 
-    button:SetHighlightTexture(MOUSE_HILIGHT, "ADD");
+    button:RegisterForClicks("LeftButtonUp", "RightButtonUp");
+    button:SetScript("OnClick", function(self, buttonName)
+        if buttonName == "RightButton" then
+            QuickBinds.EnterQuickKeybindMode();
+        end
+    end);
 
     button:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
         GameTooltip:SetText("Quick Binds", 1, 1, 1);
+        GameTooltip:AddLine("Right-click: Quick Keybind Mode");
         GameTooltip:Show();
     end);
     button:SetScript("OnLeave", function()

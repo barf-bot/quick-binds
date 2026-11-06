@@ -83,7 +83,7 @@ Answers to the three design questions:
   - test: both static checks (existing) + drag API names now exercised by code the T2 list
     already covers. Visual: circle above minimap, drag → `/reload` → still there, `/qbcenter` re-centers.
 
-- [ ] T4: Right-click enters Quick Keybind Mode; `/qb`
+- [x] T4: Right-click enters Quick Keybind Mode; `/qb`
   - files: `QuickBinds/Core.lua` (`EnterQuickKeybindMode`), `QuickBinds/MinimapButton.lua`
     (register `LeftButton RightButton` clicks, OnClick right branch, tooltip line)
   - change: `Core.EnterQuickKeybindMode()`: refuse with one chat message when
