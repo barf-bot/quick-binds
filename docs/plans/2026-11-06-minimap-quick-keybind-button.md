@@ -53,7 +53,7 @@ Answers to the three design questions:
   - test: `node tools/check-lua.mjs` (new). Visual on player side: `/reload` with the folder
     installed produces no addon-load error (button itself comes in T3).
 
-- [ ] T2: API cross-check script against Blizzard UI source dump
+- [x] T2: API cross-check script against Blizzard UI source dump
   - files: `tools/check-apis.mjs`, `AGENTS.md` (checks section)
   - change: script downloads the `Gethe/wow-ui-source` `live` tarball
     (`codeload.github.com/Gethe/wow-ui-source/tar.gz/refs/heads/live`, ~6 MB) into

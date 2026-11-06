@@ -22,10 +22,7 @@ commit:
     npm --prefix tools install   # once; installs luaparse
     node tools/check-lua.mjs     # Lua syntax pass over QuickBinds/*.lua (Lua 5.1 dialect)
     node tools/check-apis.mjs    # API names vs Blizzard's own UI source (Gethe/wow-ui-source, live)
-    bash tools/package.sh        # builds dist/ zip + verifies folder/zip layout
-
-(`node tools/check-apis.mjs` and `tools/package.sh` arrive with plan tasks T2 and T7; run
-whichever exist.)
+(`tools/package.sh` arrives with plan task T7; run whichever checks exist.)
 
 ## Install (where a human verifies it)
 
