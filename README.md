@@ -15,8 +15,11 @@ Copy the `QuickBinds/` folder into:
 
     <World of Warcraft>/_forever_/Interface/AddOns/
 
-(or unzip the release zip there — it contains `QuickBinds/` as its only root entry) and
-`/reload`.
+**From the release zip:** `bash tools/package.sh` builds `dist/QuickBinds-v<version>.zip`
+(verified to contain `QuickBinds/` as its single root entry); unzip it into the `AddOns`
+folder above.
+
+Either way, `/reload` in game afterwards.
 
 `## Interface: 16001, 120105` — loads in WoW: Forever (1.60.1) and Modern.
 

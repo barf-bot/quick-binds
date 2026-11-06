@@ -132,7 +132,7 @@ Answers to the three design questions:
   - test: static checks (`Settings.OpenToCategory`, `Settings.KEYBINDINGS_CATEGORY_ID` in T2
     list). Visual: panel opens on the Keybindings page; forced-nil run shows the chat line.
 
-- [ ] T7: Release zip and packaging check
+- [x] T7: Release zip and packaging check
   - files: `tools/package.sh`, `tools/check-package.mjs`, `README.md` (install-from-zip section)
   - change: `package.sh` builds `dist/QuickBinds-v0.1.0.zip` with
     `python3 -m zipfile -c` (no `zip` binary on this machine) containing `QuickBinds/` as the
