@@ -28,3 +28,22 @@ SLASH_QUICKBIND1 = "/qb";
 SlashCmdList["QUICKBIND"] = function()
     QuickBinds.EnterQuickKeybindMode();
 end;
+
+-- Binding persistence. Quick Keybind Mode applies SetBinding immediately in memory,
+-- but only a SaveBindings writes it to disk. Esc exits the mode through
+-- QuickKeybindFrameMixin:CancelBinding, which first reverts unsaved changes with
+-- LoadBindings (Blizzard_QuickKeybind/QuickKeybind.lua:178-205), so saving on the
+-- frame's OnHide would be too late for the Esc path. Saving on every
+-- KeybindListener.RebindSuccess (triggered per accepted rebind in
+-- Blizzard_Settings_Shared/Blizzard_Keybindings.lua:117) means the Esc revert reloads
+-- already-saved state: Esc keeps new binds, exactly like Okay. PLAYER_LOGOUT saves as
+-- a safety net for anything left uncommitted at session end.
+local function SaveCurrentBindings()
+    SaveBindings(GetCurrentBindingSet());
+end
+
+EventRegistry:RegisterCallback("KeybindListener.RebindSuccess", SaveCurrentBindings);
+
+local logoutSaver = CreateFrame("Frame");
+logoutSaver:RegisterEvent("PLAYER_LOGOUT");
+logoutSaver:SetScript("OnEvent", SaveCurrentBindings);

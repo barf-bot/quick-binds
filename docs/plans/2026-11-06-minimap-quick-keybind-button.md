@@ -99,7 +99,7 @@ Answers to the three design questions:
   - test: static checks + `/qb` name in T2 list (`ShowUIPanel`, `InCombatLockdown`). Visual:
     mode frame opens from button and chat, key-press rebinds an action button.
 
-- [ ] T5: Bindings survive Esc — save on every successful rebind and at logout
+- [x] T5: Bindings survive Esc — save on every successful rebind and at logout
   - files: `QuickBinds/Core.lua` (persistence init + event frame)
   - change: `EventRegistry:RegisterCallback("KeybindListener.RebindSuccess", ...)` →
     `SaveBindings(GetCurrentBindingSet())`, plus `PLAYER_LOGOUT` on a hidden frame → same save.
