@@ -1,0 +1,2 @@
+-- QuickBinds minimap button: circular button parented to Minimap, draggable,
+-- position persisted in QuickBindsDB. Built in T3.

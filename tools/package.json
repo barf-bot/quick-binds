@@ -1,0 +1,9 @@
+{
+  "name": "quick-binds-tools",
+  "private": true,
+  "type": "module",
+  "description": "Static checks for the QuickBinds addon (no WoW client on this machine)",
+  "dependencies": {
+    "luaparse": "^0.3.1"
+  }
+}

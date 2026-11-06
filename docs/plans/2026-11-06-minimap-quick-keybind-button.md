@@ -1,6 +1,6 @@
 # minimap-quick-keybind-button
 
-Status: planned
+Status: in progress
 
 ## Design
 
@@ -38,7 +38,7 @@ Answers to the three design questions:
 
 ## Tasks
 
-- [ ] T1: Loadable skeleton, repo docs, Lua syntax check
+- [x] T1: Loadable skeleton, repo docs, Lua syntax check
   - files: `QuickBinds/QuickBinds.toc`, `QuickBinds/Core.lua`, `QuickBinds/MinimapButton.lua`,
     `tools/package.json`, `tools/check-lua.mjs`, `AGENTS.md`, `README.md`, `.gitignore`
   - change: TOC with `## Interface: 16001, 120105`, `## Title: Quick Binds`,
@@ -144,3 +144,18 @@ Answers to the three design questions:
     check; deleting a file from the TOC makes the layout check exit non-zero.
   - test: `bash tools/package.sh` (new, bundles `check-package.mjs`). Visual: unzip of the
     artifact yields `QuickBinds/QuickBinds.toc` directly under the drop folder.
+
+- [ ] T8: In-repo addon icon `Media/icon.tga`
+  - files: `tools/make-icon.py`, `QuickBinds/Media/icon.tga`, `QuickBinds/QuickBinds.toc`,
+    `QuickBinds/MinimapButton.lua`, `tools/check-package.mjs`
+  - change: commit `tools/make-icon.py` which writes an uncompressed 32-bit BGRA TGA
+    (square, alpha): rounded keycap with "KB" on a dark background, legible at 32x32; run it
+    and commit the `.tga`. TOC gains `## IconTexture: Interface\AddOns\QuickBinds\Media\icon.tga`
+    (media, so correctly NOT a TOC file entry). The minimap button reuses this texture, with
+    the "KB" text kept as the fallback path, no new dependencies.
+  - done when: `python3 tools/make-icon.py` rewrites `QuickBinds/Media/icon.tga`
+    byte-identically on a second run; `bash tools/package.sh` passes with the added
+    assertion that the `.tga` is in the zip; Lua/TOC checks pass.
+  - test: `bash tools/package.sh` (existing, extended with the tga assertion). Visual: render
+    the keycap pixels to a scratch PNG preview and look at it at 32x32 (preview stays
+    uncommitted).
