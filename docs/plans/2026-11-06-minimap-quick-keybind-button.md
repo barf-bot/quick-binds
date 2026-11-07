@@ -145,7 +145,7 @@ Answers to the three design questions:
   - test: `bash tools/package.sh` (new, bundles `check-package.mjs`). Visual: unzip of the
     artifact yields `QuickBinds/QuickBinds.toc` directly under the drop folder.
 
-- [ ] T8: In-repo addon icon `Media/icon.tga`
+- [x] T8: In-repo addon icon `Media/icon.tga`
   - files: `tools/make-icon.py`, `QuickBinds/Media/icon.tga`, `QuickBinds/QuickBinds.toc`,
     `QuickBinds/MinimapButton.lua`, `tools/check-package.mjs`
   - change: commit `tools/make-icon.py` which writes an uncompressed 32-bit BGRA TGA

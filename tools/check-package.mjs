@@ -60,6 +60,9 @@ for (const entry of entries) {
   }
 }
 
+need(entrySet.has("QuickBinds/Media/icon.tga"), "Media/icon.tga is in the zip (media, not TOC-listed)");
+need(!tocFiles.some((f) => !f.endsWith(".lua")), "TOC file entries are code, not media");
+
 if (failed) {
   console.error(`check-package: FAILED for ${zip}`);
   process.exit(1);

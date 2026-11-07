@@ -3,6 +3,7 @@
 ## Notes: Minimap button for Quick Keybind Mode and the Keybindings panel.
 ## Version: 0.1.0
 ## SavedVariables: QuickBindsDB
+## IconTexture: Interface\AddOns\QuickBinds\Media\icon.tga
 
 Core.lua
 MinimapButton.lua
