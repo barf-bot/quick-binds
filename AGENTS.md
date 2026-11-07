@@ -21,7 +21,7 @@ commit:
 
     npm --prefix tools install   # once; installs luaparse
     node tools/check-lua.mjs     # Lua syntax pass over QuickBinds/*.lua (Lua 5.1 dialect)
-    node tools/check-drag.mjs    # dragged frames are movable (SetMovable(true) precedes OnDragStart)
+    node tools/check-drag.mjs    # dragged frames are movable (SetMovable(true) precedes OnDragStart) and ride the ring
     node tools/check-apis.mjs    # API names vs Blizzard's own UI source (Gethe/wow-ui-source, live)
     node tools/check-icon.mjs    # icon.tga matches make-icon.py, is a disc, label matches art
     bash tools/package.sh        # builds dist/ zip + verifies folder/zip layout

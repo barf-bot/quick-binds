@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-11-07 — minimap-ring-drag (v0.1.4)
+
+- Dragging no longer parks the button in the middle of the screen: its centre may only
+  sit on the circle around the minimap. `OnDragStop` now positions the frame at the ring
+  point for the angle under the pointer instead of keeping the raw `GetCenter()` pair
+  v0.1.1 stored, so the frame still follows the pointer while dragged and snaps onto the
+  ring the moment the drag stops. The orbit radius is the minimap's own —
+  `self:GetWidth() / 2`, the way Blizzard measures the minimap circle
+  (`Blizzard_Minimap/Mainline/Minimap.lua:164`) — lifted by the 4 points of the old
+  `SetPoint("CENTER", Minimap, "TOP", 0, 4)` anchor, so a fresh install and `/qbcenter`
+  show exactly the spot the button always used, now as the top of the ring.
+- `QuickBindsDB.minimapButton` stores `angle` (radians) instead of free `x`/`y`. An old
+  `{ x = ..., y = ... }` entry still loads: the saved viewport point is projected onto
+  the ring, and the next save writes the angle. Clicks and the tooltip are unchanged.
+- Tooling: `tools/check-drag.mjs` keeps the v0.1.1 movability assertions and gains the
+  ring rule — the drag-stop path must reach the file's one angle → point helper
+  (`math.cos`/`math.sin`) and `QuickBindsDB.minimapButton` must hold an angle, so a drag
+  that persists raw coordinates fails the build. `GetWidth`, `math.atan2`, `math.cos`,
+  `math.sin` and `math.pi` joined the `check-apis.mjs` name list.
+
 ## 2026-11-07 — minimap-button-art (v0.1.3)
 
 - The minimap button now reads **QB** and is a **round disc** instead of a blocky

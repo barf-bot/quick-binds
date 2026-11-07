@@ -6,7 +6,8 @@ A minimap button for **WoW: Forever** (and Modern) that exposes the built-in
 - **Right-click** the button (or `/qb`) — straight into Quick Keybind Mode: hover an
   action button, press a key. Esc or Okay keeps your new binds.
 - **Left-click** (or `/qbk`) — opens Settings at the Keybindings category.
-- **Drag** the button anywhere; position is remembered. `/qbcenter` re-centers it.
+- **Drag** the button around the edge of the minimap — it stays on that ring; the angle
+  is remembered, and `/qbcenter` puts it back on top.
 - Both clicks refuse during combat (bindings are protected then).
 
 ## Install

@@ -5,37 +5,80 @@
 -- the client's TempPortraitAlphaMask renders square here, so the masked colour plate it
 -- used is gone; the hover glow comes from the minimap's own highlight texture.
 -- Left-drag moves the button (StartMoving consumes the press, so a click only fires when
--- you don't drag); the position is stored in QuickBindsDB.minimapButton in viewport units
--- and restored on every load. `/qbcenter` clears the saved position and re-centers.
+-- you don't drag), but only around the minimap: where the drag ends is read as an angle
+-- and rebuilt as the ring point at that angle, and QuickBindsDB.minimapButton keeps that
+-- angle — v0.1.1's free viewport x/y still load, projected onto the ring. `/qbcenter`
+-- clears the saved angle and puts the button back at the top of the ring.
 
 local QuickBinds = QuickBinds;
 
 local SIZE = 32;
 local ICON_PATH = "Interface\\AddOns\\QuickBinds\\Media\\icon.tga";
 local MOUSE_HILIGHT = "Interface\\Buttons\\UI-Common-MouseHilight";
+-- The orbit the button rides, in the coordinate space SetPoint uses (UIParent units).
+-- Its radius is the minimap's own: `self:GetWidth() / 2` is how Blizzard measures the
+-- minimap circle (MinimapMixin:OnClick, Blizzard_Minimap/Mainline/Minimap.lua:164, on a
+-- 198x198 square frame — Minimap.xml:179). The anchor this button used before the ring,
+-- `SetPoint("CENTER", Minimap, "TOP", 0, 4)`, sat 4 points above that edge, so the ring
+-- keeps that lift and the default position is the spot it has always used.
+local DEFAULT_LIFT = 4;
+local DEFAULT_ANGLE = math.pi / 2; -- straight up: the top of the ring
 
 local button;
 
-local function ApplyDefaultPosition()
-    button:ClearAllPoints();
-    button:SetPoint("CENTER", Minimap, "TOP", 0, 4);
+-- Minimap centre and orbit radius in UIParent units: GetCenter/GetWidth speak the
+-- minimap's scale, so both go through the conversion v0.1.1 already saved with.
+local function RingGeometry()
+    local scaleRatio = Minimap:GetEffectiveScale() / UIParent:GetEffectiveScale();
+    local x, y = Minimap:GetCenter();
+    return x * scaleRatio, y * scaleRatio, (Minimap:GetWidth() / 2 + DEFAULT_LIFT) * scaleRatio;
 end
 
+-- The one polar helper: an angle on the ring in, the viewport point on it out.
+local function PointAtAngle(angle)
+    local x, y, radius = RingGeometry();
+    return x + radius * math.cos(angle), y + radius * math.sin(angle);
+end
+
+-- The angle around the minimap of any viewport point; the two-argument arctangent of
+-- Lua 5.1 that Blizzard uses too (Blizzard_SharedXMLBase/MathUtil.lua:106).
+local function AngleAt(x, y)
+    local cx, cy = RingGeometry();
+    return math.atan2(y - cy, x - cx);
+end
+
+-- The one way the frame is ever positioned: an angle becomes a point on the ring, so the
+-- button centre cannot end up anywhere but on the circle.
+local function ApplyAngle(angle)
+    local x, y = PointAtAngle(angle);
+    button:ClearAllPoints();
+    button:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x, y);
+end
+
+local function ApplyDefaultPosition()
+    ApplyAngle(DEFAULT_ANGLE);
+end
+
+-- On drag stop: measure the angle the pointer left the button at, save it, and re-anchor
+-- the frame on the ring — the raw GetCenter() pair v0.1.1 stored is gone by design.
 local function SavePosition()
     local x, y = button:GetCenter();
     if not x or not y then
         return;
     end
-    -- Viewport coordinates converted to UIParent scale: survives minimap cvar moves.
     local scaleRatio = button:GetEffectiveScale() / UIParent:GetEffectiveScale();
-    QuickBindsDB.minimapButton = { x = x * scaleRatio, y = y * scaleRatio };
+    local angle = AngleAt(x * scaleRatio, y * scaleRatio);
+    QuickBindsDB.minimapButton = { angle = angle };
+    ApplyAngle(angle);
 end
 
 local function RestorePosition()
     local pos = QuickBindsDB and QuickBindsDB.minimapButton;
-    if pos and pos.x and pos.y then
-        button:ClearAllPoints();
-        button:SetPoint("CENTER", UIParent, "BOTTOMLEFT", pos.x, pos.y);
+    -- `{ x = ..., y = ... }`: a v0.1.1 save with no angle. Load the ring angle that
+    -- point implies instead of the free coordinates, so old saves keep their button.
+    local angle = pos and (pos.angle or (pos.x and pos.y and AngleAt(pos.x, pos.y)));
+    if angle then
+        ApplyAngle(angle);
     else
         ApplyDefaultPosition();
     end

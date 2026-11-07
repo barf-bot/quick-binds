@@ -42,6 +42,11 @@ const REQUIRED = [
   "SetMovable",
   "StopMovingOrSizing",
   "RegisterForClicks",
+  "GetWidth",
+  "math.atan2",
+  "math.cos",
+  "math.sin",
+  "math.pi",
 ];
 
 // Verified absent from this client: C_Minimap has no RegisterMinimapButton, which is
