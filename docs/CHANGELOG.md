@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-11-07 — quick-keybind-settings-window (v0.1.2)
+
+- Opening Quick Keybind Mode (right-click / `/qb`) left the Interface Options
+  window open behind it: closing the mode with Okay or Cancel revealed Settings
+  again, so leaving it took a second Esc. `EnterQuickKeybindMode()` now dismisses
+  the Settings window first, with Blizzard's own skip-back flag
+  (`pcall(SettingsPanel.Close, SettingsPanel, true)`, i.e.
+  `SettingsPanel:Close(true)`), the same sequence as the Keybindings panel's own
+  "Quick keybind" button
+  (`Blizzard_SettingsDefinitions_Frame/Mainline/KeybindingsOverrides.lua:37-39`).
+  Clients where the Settings addon is not loaded, or the window is hidden, behave
+  exactly as before — no extra `LoadAddOn` call, no new chat lines.
+- Tooling: `tools/check-apis.mjs` now also asserts that every function showing
+  `QuickKeybindFrame` closes a shown `SettingsPanel` with the skip-back flag
+  beforehand (fails on the 0.1.1 source, passes on this fix), and `SettingsPanel`,
+  `Close` and `IsShown` joined its API name list.
+
 ## 2026-11-07 — minimap-button-drag-fix (v0.1.1)
 
 - Dragging the minimap button did nothing: the frame was never declared movable,

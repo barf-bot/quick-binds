@@ -15,7 +15,12 @@ end
 
 -- Enter Blizzard's Quick Keybind Mode. The mode lives in the LoadOnDemand addon
 -- Blizzard_QuickKeybind; ShowUIPanel(QuickKeybindFrame) is the entry point (its own
--- Okay button commits bindings via KeybindListener:Commit()).
+-- Okay button commits bindings via KeybindListener:Commit()). The Settings window is
+-- dismissed first, exactly like Blizzard's own "Quick keybind" button
+-- (Blizzard_SettingsDefinitions_Frame/Mainline/KeybindingsOverrides.lua:37-39):
+-- leaving it up behind the mode makes closing the mode reveal Interface Options, so
+-- the player has to press Esc twice. pcall keeps the close safe where the panel
+-- never loads.
 function QuickBinds.EnterQuickKeybindMode()
     if InCombatLockdown() then
         DEFAULT_CHAT_FRAME:AddMessage(MSG_COMBAT);
@@ -25,6 +30,9 @@ function QuickBinds.EnterQuickKeybindMode()
     if not loaded then
         DEFAULT_CHAT_FRAME:AddMessage(MSG_NO_MODE);
         return;
+    end
+    if SettingsPanel and SettingsPanel:IsShown() then
+        pcall(SettingsPanel.Close, SettingsPanel, true);
     end
     ShowUIPanel(QuickKeybindFrame);
 end
