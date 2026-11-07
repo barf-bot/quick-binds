@@ -1,7 +1,7 @@
 ## Interface: 16001, 120105
 ## Title: Quick Binds
 ## Notes: Minimap button for Quick Keybind Mode and the Keybindings panel.
-## Version: 0.1.2
+## Version: 0.1.3
 ## SavedVariables: QuickBindsDB
 ## IconTexture: Interface\AddOns\QuickBinds\Media\icon.tga
 

@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-11-07 — minimap-button-art (v0.1.3)
+
+- The minimap button now reads **QB** and is a **round disc** instead of a blocky
+  rounded-square keycap. `QuickBinds/Media/icon.tga` was rebuilt around a geometric
+  circle — `tools/make-icon.py` fills `in_circle` where it used `in_rounded_rect`,
+  giving a dark rim, a lit face and the engraved legend — which meant adding a `Q`
+  glyph to the generator's `FONT` table and rendering `LEGEND_TEXT = "QB"`.
+  `MinimapButton.lua` now takes its shape from that art: the colour plate it used to
+  mask with `Interface\\CharacterFrame\\TempPortraitAlphaMask` rendered square in the
+  client, and its `label` fallback text changed `"KB"` → `"QB"`. Size, drag handlers,
+  saved position and `/qbcenter` are unchanged.
+- Tooling: `tools/check-icon.mjs` fails the build when the committed `icon.tga` is not
+  byte-for-byte what `tools/make-icon.py` renders (so the binary can no longer be
+  hand-edited or left behind by a legend change), when the art's alpha silhouette stops
+  being the disc the generator declares (`SIZE`/`SS`/`DISC_R_PX`), or when
+  `MinimapButton.lua` drifts from the art (`label` text vs `LEGEND_TEXT`, artwork
+  texture vs the shipped `Media/icon.tga`). `make-icon.py` gained `--out PATH` so the
+  check can render without touching the addon folder, `__pycache__/` joined
+  `.gitignore`, and the check is listed in `AGENTS.md`.
+
 ## 2026-11-07 — quick-keybind-settings-window (v0.1.2)
 
 - Opening Quick Keybind Mode (right-click / `/qb`) left the Interface Options

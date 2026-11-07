@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
-"""Generate QuickBinds/Media/icon.tga — a rounded keycap with "KB", on a dark
-background, for the addon's minimap button and addon-list icon.
+"""Generate QuickBinds/Media/icon.tga — a round disc reading "QB", for the
+addon's minimap button and addon-list icon.
 
 Pure stdlib (zlib only for the optional --preview PNG), integer math on a 4x
 supersampled grid, so output is byte-identical on every run. 64x64,
 uncompressed 32-bit BGRA TGA, alpha included. Regenerate with:
 
-    python3 tools/make-icon.py [--preview]
+    python3 tools/make-icon.py [--out PATH] [--preview]
+
+tools/check-icon.mjs re-runs this file, compares the bytes with the committed
+icon.tga, checks the alpha silhouette against DISC_R_PX and the button's label text
+against LEGEND_TEXT -- keep those constants describing the art, not fighting it.
 """
 import os
 import struct
@@ -17,15 +21,30 @@ SIZE = 64
 SS = 4  # supersample factor: render at 256x256, box-down to 64x64
 HIGH = SIZE * SS
 
+LEGEND_TEXT = "QB"  # the disc's legend, and MinimapButton.lua's label text
+
+# Geometry, in high-res units (check-icon.mjs reads SIZE, SS and DISC_R_PX).
+DISC_R_PX = 30  # disc silhouette radius: a 2px transparent margin at 64x64
+DISC_R = DISC_R_PX * SS
+FACE_R = 27 * SS  # lit face; the band out to DISC_R is the rim
+CENTER = HIGH // 2
+
 # Palette (R, G, B)
-BG = (20, 20, 28)           # dark background plate
-CAP_TOP = (232, 232, 240)   # keycap face, lit top
-CAP_BOT = (176, 176, 190)   # keycap face, shaded bottom
-CAP_EDGE = (52, 52, 62)     # keycap outline
-CAP_SHADOW = (96, 96, 110)  # underside shadow band
-LEGEND = (34, 34, 44)       # "KB" legend, dark engraving
+RIM = (52, 52, 62)  # disc edge
+FACE_TOP = (232, 232, 240)  # disc face, lit top
+FACE_BOT = (176, 176, 190)  # disc face, shaded bottom
+LEGEND = (34, 34, 44)  # "QB" legend, dark engraving
 
 FONT = {
+    "Q": [
+        "0 1 1 1 0",
+        "1 0 0 0 1",
+        "1 0 0 0 1",
+        "1 0 0 0 1",
+        "1 0 1 0 1",
+        "1 0 0 1 1",
+        "0 1 1 1 1",
+    ],
     "K": [
         "1 0 0 0 1",
         "1 0 0 1 0",
@@ -51,14 +70,8 @@ def lerp(a, b, t):
     return tuple(round(a[i] + (b[i] - a[i]) * t) for i in range(3))
 
 
-def in_rounded_rect(x, y, x0, y0, x1, y1, r):
-    """Inside the rect, with the four corners cut to radius r."""
-    if x < x0 or x >= x1 or y < y0 or y >= y1:
-        return False
-    if x0 + r <= x < x1 - r or y0 + r <= y < y1 - r:
-        return True
-    cx = x0 + r if x < x0 + r else x1 - r
-    cy = y0 + r if y < y0 + r else y1 - r
+def in_circle(x, y, cx, cy, r):
+    """Inside the circle of radius r centred on (cx, cy)."""
     return (x - cx) ** 2 + (y - cy) ** 2 <= r * r
 
 
@@ -66,11 +79,11 @@ def render_legend():
     """Legend glyph blocks as (x0, y0, side) squares in high-res coords."""
     scale = 10
     glyph_w, glyph_h, gap = 5, 7, 2
-    total_w = glyph_w * 2 + gap
+    total_w = (glyph_w + gap) * len(LEGEND_TEXT) - gap
     ox = (HIGH - total_w * scale) // 2
-    oy = 30 * SS - (glyph_h * scale) // 2  # centered on the keycap face
+    oy = CENTER - (glyph_h * scale) // 2
     blocks = []
-    for gi, ch in enumerate("KB"):
+    for gi, ch in enumerate(LEGEND_TEXT):
         gx = ox + gi * (glyph_w + gap) * scale
         for row, line in enumerate(FONT[ch]):
             for col, bit in enumerate(line.split()):
@@ -80,26 +93,19 @@ def render_legend():
 
 
 def render():
-    plate = (6, 6, HIGH - 6, HIGH - 6, 10 * SS)           # background plate
-    edge = (10 * SS, 8 * SS, 54 * SS, 52 * SS, 12 * SS)   # keycap outline
-    cap = (12 * SS, 10 * SS, 52 * SS, 50 * SS, 10 * SS)   # keycap face
-    shadow = (13 * SS, 50 * SS, 51 * SS, 52 * SS, 6 * SS)  # underside band
     legend = render_legend()
-    cap_h = cap[3] - cap[1]
+    face_top, face_bot = CENTER - FACE_R, CENTER + FACE_R
+    face_h = face_bot - face_top
     rows = []
     for y in range(HIGH):
         row = []
         for x in range(HIGH):
             if any(x >= x0 and x < x0 + s and y >= y0 and y < y0 + s for x0, y0, s in legend):
-                color = (*LEGEND, 255)
-            elif in_rounded_rect(x, y, *cap):
-                color = (*lerp(CAP_TOP, CAP_BOT, (y - cap[1]) / cap_h), 255)
-            elif in_rounded_rect(x, y, *shadow):
-                color = (*CAP_SHADOW, 255)
-            elif in_rounded_rect(x, y, *edge):
-                color = (*CAP_EDGE, 255)
-            elif in_rounded_rect(x, y, *plate):
-                color = (*BG, 255)
+                color = (*LEGEND, 255)  # engraved legend
+            elif in_circle(x, y, CENTER, CENTER, FACE_R):
+                color = (*lerp(FACE_TOP, FACE_BOT, (y - face_top) / face_h), 255)
+            elif in_circle(x, y, CENTER, CENTER, DISC_R):
+                color = (*RIM, 255)
             else:
                 color = (0, 0, 0, 0)
             row.append(color)
@@ -168,13 +174,26 @@ def write_preview_png(pixels, path, scale=1):
         f.write(chunk(b"IEND", b""))
 
 
-if __name__ == "__main__":
-    pixels = downsample(render())
+def parse_args(argv):
+    """`--out PATH` (default: the shipped addon art) plus the `--preview` flag."""
     target = "QuickBinds/Media/icon.tga"
-    os.makedirs(os.path.dirname(target), exist_ok=True)
+    for i, arg in enumerate(argv):
+        if arg == "--out" and i + 1 < len(argv):
+            target = argv[i + 1]
+        elif arg.startswith("--out="):
+            target = arg.split("=", 1)[1]
+    return target, "--preview" in argv
+
+
+if __name__ == "__main__":
+    target, preview = parse_args(sys.argv[1:])
+    pixels = downsample(render())
+    directory = os.path.dirname(target)
+    if directory:
+        os.makedirs(directory, exist_ok=True)
     write_tga(pixels, target)
     print(f"wrote {target} ({SIZE}x{SIZE} 32-bit uncompressed TGA)")
-    if "--preview" in sys.argv:
+    if preview:
         write_preview_png(pixels, "/tmp/quickbinds-icon-preview.png", scale=6)
         avg = lambda y, x, i: sum(pixels[2 * y + dy][2 * x + dx][i] for dy in range(2) for dx in range(2)) // 4
         small = [[tuple(avg(y, x, i) for i in range(4)) for x in range(32)] for y in range(32)]
