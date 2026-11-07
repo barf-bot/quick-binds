@@ -34,6 +34,8 @@ const REQUIRED = [
   "RegisterForDrag",
   "StartMoving",
   "StopMoving",
+  "SetMovable",
+  "StopMovingOrSizing",
   "RegisterForClicks",
 ];
 

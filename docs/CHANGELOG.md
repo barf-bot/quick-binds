@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-11-07 — minimap-button-drag-fix (v0.1.1)
+
+- Dragging the minimap button did nothing: the frame was never declared movable,
+  and `StartMoving`/`StopMovingOrSizing` are no-ops without `SetMovable(true)`
+  (FrameXML pairs them, e.g. `movable="true" registerForDrag="LeftButton"` in
+  Blizzard_MovePad.xml). `CreateButton()` now sets the frame movable, so the
+  drag works and the saved-position path (`SavePosition` →
+  `QuickBindsDB.minimapButton` → `RestorePosition`) is finally used.
+- Tooling: `tools/check-drag.mjs` fails the build if a file calls `StartMoving()`
+  without `SetMovable(true)` in frame setup ahead of `OnDragStart`;
+  `SetMovable`/`StopMovingOrSizing` added to the `check-apis.mjs` name list.
+
 ## 2026-11-07 — minimap-quick-keybind-button (v0.1.0)
 
 - Minimap button "KB": circular, ships its own generated keycap icon

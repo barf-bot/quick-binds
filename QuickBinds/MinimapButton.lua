@@ -54,6 +54,7 @@ local function CreateButton()
     button:SetSize(SIZE, SIZE);
     button:SetClampedToScreen(true);
     button:EnableMouse(true);
+    button:SetMovable(true);
     button:RegisterForDrag("LeftButton");
 
     local background = button:CreateTexture(nil, "BACKGROUND");
