@@ -1,6 +1,6 @@
 # minimap-quick-keybind-button
 
-Status: in progress
+Status: done
 
 ## Design
 
