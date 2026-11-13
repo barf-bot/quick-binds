@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-11-13 — minimap-button-frame-level-and-art (v0.1.5)
+
+- The button now renders above the minimap border instead of underneath it: the disc
+  was cut in half by the bronze `BorderTop` ring that belongs to `MinimapCluster`.
+  `CreateButton` raises the frame with Blizzard's own recipe (`MinimapClusterMixin:OnLoad`,
+  `Blizzard_Minimap/Mainline/Minimap.lua:373-374`: the cluster's frame level + 10);
+  clients without the `MinimapCluster` global fall back to `Minimap:GetFrameLevel() + 10`.
+- `tools/make-icon.py` redraws the art to fill its whole 64 px canvas (v0.1.4's
+  radius-30 disc left a 2 px transparent margin, so the visible disc measured 30 of
+  the 32-unit frame beside ~33 px neighbours) and restyles it to the treatment the
+  other minimap buttons share — gold rim, silver inner ring, dark plate with a gold
+  `QB` legend, the gold-on-dark language of the sibling addon RankOne.
+  `QuickBinds/Media/icon.tga` is regenerated; the same file is the TOC `## IconTexture`,
+  so the addon-list icon gains the ring too. Frame size, ring/drag maths, clicks,
+  tooltip, commands and the TOC `## Interface:` line are unchanged.
+- Tooling: `tools/check-icon.mjs` now also pins the inscribed-disc margin contract
+  (`DISC_R_PX` = half of `SIZE`) and samples the gold/silver/plate palette from the
+  rendered TGA; `MinimapCluster`, `GetFrameLevel` and `SetFrameLevel` joined the
+  `check-apis.mjs` name list.
+
 ## 2026-11-07 — minimap-ring-drag (v0.1.4)
 
 - Dragging no longer parks the button in the middle of the screen: its centre may only

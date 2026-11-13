@@ -4,11 +4,16 @@
 //      (`python3 tools/make-icon.py --out <temp>`) — a stale or hand-edited binary
 //      fails, and the label text cannot be changed without regenerating the art;
 //   2. the icon's opaque silhouette is exactly the disc the generator declares
-//      (SIZE / SS / DISC_R_PX), so art that slides back to a square or
-//      rounded-rect plate fails even if the .tga is a faithful render of that;
-//   3. the `label` text in QuickBinds/MinimapButton.lua equals the generator's
+//      (SIZE / SS / DISC_R_PX) and that disc is the canvas inscribed — no
+//      transparent margin since v0.1.5 — so art that slides back to a square or
+//      rounded-rect plate, or shrinks inside its frame, fails even if the .tga is
+//      a faithful render of that;
+//   3. the pixels sampled from each ring band carry the declared palette — GOLD
+//      rim, SILVER inner ring, dark PLATE — so the art cannot drift off the
+//      minimap-button treatment without the generator being updated too;
+//   4. the `label` text in QuickBinds/MinimapButton.lua equals the generator's
 //      LEGEND_TEXT, so the text fallback never reads something else than the art;
-//   4. the button draws its artwork from that shipped path — a Blizzard texture may
+//   5. the button draws its artwork from that shipped path — a Blizzard texture may
 //      only appear once it is verified (AGENTS.md), never as an unverified guess.
 // Run: node tools/check-icon.mjs
 import { execFileSync } from "node:child_process";
@@ -41,22 +46,46 @@ if (!existsSync(buttonLua)) {
 }
 
 // --- the contract the generator declares ----------------------------------------
-// SIZE, SS, DISC_R_PX and LEGEND_TEXT are plain module constants of make-icon.py and
-// are exactly what its renderer uses, so reading them costs no second geometry.
+// SIZE, SS, DISC_R_PX and LEGEND_TEXT plus the two inner ring radii (SILVER_R_PX,
+// PLATE_R_PX) and the palette colours (GOLD, SILVER, PLATE) are plain module
+// constants of make-icon.py and are exactly what its renderer uses, so reading
+// them costs no second geometry.
 const gen = readFileSync(genPy, "utf8");
 const intConst = (name) => {
   const found = gen.match(new RegExp(`^${name} += *(\\d+)`, "m"));
   return found === null ? null : Number(found[1]);
 };
+const colourConst = (name) => {
+  const channel = "(0[xX][0-9A-Fa-f]{1,2}|\\d+)";
+  const found = gen.match(new RegExp(`^${name} += *\\(${channel}, *${channel}, *${channel}\\)`, "m"));
+  return found === null ? null : [Number(found[1]), Number(found[2]), Number(found[3])];
+};
 const size = intConst("SIZE");
 const ss = intConst("SS");
 const discRadiusPx = intConst("DISC_R_PX");
+const silverRadiusPx = intConst("SILVER_R_PX");
+const plateRadiusPx = intConst("PLATE_R_PX");
 const legendText = (gen.match(/^LEGEND_TEXT += *"([^"]*)"/m) ?? [])[1] ?? null;
+const gold = colourConst("GOLD");
+const silver = colourConst("SILVER");
+const plate = colourConst("PLATE");
 
-if (size === null || ss === null || discRadiusPx === null || legendText === null) {
+if (
+  size === null ||
+  ss === null ||
+  discRadiusPx === null ||
+  silverRadiusPx === null ||
+  plateRadiusPx === null ||
+  gold === null ||
+  silver === null ||
+  plate === null ||
+  legendText === null
+) {
   console.error(
     "FAIL: tools/make-icon.py declares no art contract " +
-      `(SIZE: ${size}, SS: ${ss}, DISC_R_PX: ${discRadiusPx}, LEGEND_TEXT: ${legendText})`,
+      `(SIZE: ${size}, SS: ${ss}, DISC_R_PX: ${discRadiusPx}, SILVER_R_PX: ${silverRadiusPx}, ` +
+      `PLATE_R_PX: ${plateRadiusPx}, GOLD: ${gold}, SILVER: ${silver}, PLATE: ${plate}, ` +
+      `LEGEND_TEXT: ${legendText})`,
   );
   process.exit(1);
 }
@@ -109,6 +138,14 @@ const headerOk =
   committed[16] === 32;
 need(headerOk, `QuickBinds/Media/icon.tga is a ${size}x${size} 32-bit TGA`);
 
+// v0.1.5 size contract: the disc is the canvas inscribed — the art fills the
+// frame, so the drawn disc is exactly the button's box (v0.1.4's radius left a
+// 2 px transparent margin that made it read smaller than its neighbours).
+need(
+  discRadiusPx * 2 === size,
+  `the declared disc is the canvas inscribed: DISC_R_PX ${discRadiusPx} is half of SIZE ${size}`,
+);
+
 if (headerOk) {
   const offShape = [];
   for (let py = 0; py < size && offShape.length < 5; py += 1) {
@@ -124,7 +161,49 @@ if (headerOk) {
   );
 }
 
-// --- 3./4. what the button shows -------------------------------------------------
+// --- 3. the ring palette: gold rim, silver inner ring, dark plate ----------------
+// One exact-colour sample per band: the leftmost output pixel on the centre row
+// whose whole SS×SS subpixel block lies inside the band's annulus (a block
+// clipped by a band border averages with its neighbour in the downsample, so it
+// is not sampled).
+if (headerOk) {
+  const centerRow = size / 2;
+  const highSilver = silverRadiusPx * ss;
+  const highPlate = plateRadiusPx * ss;
+  const pixelAt = (px, py) => {
+    const o = 18 + (py * size + px) * 4;
+    return [committed[o + 2], committed[o + 1], committed[o]]; // the TGA stores BGRA
+  };
+  const purePixelOnRow = (innerRadius, outerRadius) => {
+    for (let px = 0; px < size; px += 1) {
+      let pure = true;
+      for (let dx = 0; dx < ss && pure; dx += 1) {
+        for (let dy = 0; dy < ss && pure; dy += 1) {
+          const ddx = px * ss + dx - highCenter;
+          const ddy = centerRow * ss + dy - highCenter;
+          const d2 = ddx * ddx + ddy * ddy;
+          pure =
+            d2 <= outerRadius * outerRadius && (innerRadius === 0 || d2 > innerRadius * innerRadius);
+        }
+      }
+      if (pure) return px;
+    }
+    return -1;
+  };
+  const checkBand = (band, px, colour) => {
+    const found = px >= 0 ? pixelAt(px, centerRow).join(", ") : null;
+    need(
+      found !== null && found === colour.join(", "),
+      `the ${band} pixel (${px >= 0 ? `${px}, ${centerRow}` : "?"}) is rgb(${colour.join(", ")})` +
+        `${found === null ? " — no fully in-band pixel on the centre row" : found === colour.join(", ") ? "" : ` but the art has rgb(${found})`}`,
+    );
+  };
+  checkBand("gold rim", purePixelOnRow(highSilver, highRadius), gold);
+  checkBand("silver ring", purePixelOnRow(highPlate, highSilver), silver);
+  checkBand("dark plate", purePixelOnRow(0, highPlate), plate);
+}
+
+// --- 4./5. what the button shows -------------------------------------------------
 // luaparse 0.3.1 leaves StringLiteral.value null — the spelling is in .raw
 function stringText(node) {
   if (!node || node.type !== "StringLiteral") return null;

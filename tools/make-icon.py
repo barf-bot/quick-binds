@@ -8,9 +8,13 @@ uncompressed 32-bit BGRA TGA, alpha included. Regenerate with:
 
     python3 tools/make-icon.py [--out PATH] [--preview]
 
-tools/check-icon.mjs re-runs this file, compares the bytes with the committed
-icon.tga, checks the alpha silhouette against DISC_R_PX and the button's label text
-against LEGEND_TEXT -- keep those constants describing the art, not fighting it.
+The art carries its own frame — gold rim, silver inner ring, dark plate — the
+treatment the other minimap buttons on this client share, in the gold-on-dark
+language of the sibling addon RankOne. tools/check-icon.mjs re-runs this file,
+compares the bytes with the committed icon.tga, checks the alpha silhouette
+against SIZE / SS / DISC_R_PX, samples the ring bands against GOLD / SILVER /
+PLATE and checks the button's label text against LEGEND_TEXT -- keep those
+constants describing the art, not fighting it.
 """
 import os
 import struct
@@ -23,17 +27,26 @@ HIGH = SIZE * SS
 
 LEGEND_TEXT = "QB"  # the disc's legend, and MinimapButton.lua's label text
 
-# Geometry, in high-res units (check-icon.mjs reads SIZE, SS and DISC_R_PX).
-DISC_R_PX = 30  # disc silhouette radius: a 2px transparent margin at 64x64
+# Geometry, in high-res units (check-icon.mjs reads SIZE, SS and the ring radii).
+# v0.1.4 drew the disc at radius 30 — a 2px transparent margin that shrank the
+# visible disc inside the button's own 32-unit frame; v0.1.5 inscribes the
+# canvas, so the art edge is the frame edge. The three radii are multiples of
+# SS, so a band the size of a full output pixel never averages two colours.
+DISC_R_PX = 32  # disc silhouette radius: the canvas half — the art fills the frame
+SILVER_R_PX = 29  # inner edge of the gold rim = outer edge of the silver ring
+PLATE_R_PX = 26  # inner edge of the silver ring = the dark plate's radius
 DISC_R = DISC_R_PX * SS
-FACE_R = 27 * SS  # lit face; the band out to DISC_R is the rim
+SILVER_R = SILVER_R_PX * SS
+PLATE_R = PLATE_R_PX * SS
 CENTER = HIGH // 2
 
-# Palette (R, G, B)
-RIM = (52, 52, 62)  # disc edge
-FACE_TOP = (232, 232, 240)  # disc face, lit top
-FACE_BOT = (176, 176, 190)  # disc face, shaded bottom
-LEGEND = (34, 34, 44)  # "QB" legend, dark engraving
+# Palette (R, G, B) — the neighbouring buttons' treatment sampled from the live
+# UI (gold ring RGB(188,158,66), silver ring RGB(199,199,199), dark plate
+# RGB(36,36,31)); the gold is RankOne's house gold 0xD6A93C, its letters too.
+GOLD = (0xD6, 0xA9, 0x3C)  # outer rim, and the lettering
+SILVER = (199, 199, 199)  # ring between the gold rim and the plate
+PLATE = (36, 36, 31)  # dark plate the legend sits on
+LEGEND = GOLD  # "QB" in gold lettering, as RankOne does
 
 FONT = {
     "Q": [
@@ -66,10 +79,6 @@ FONT = {
 }
 
 
-def lerp(a, b, t):
-    return tuple(round(a[i] + (b[i] - a[i]) * t) for i in range(3))
-
-
 def in_circle(x, y, cx, cy, r):
     """Inside the circle of radius r centred on (cx, cy)."""
     return (x - cx) ** 2 + (y - cy) ** 2 <= r * r
@@ -94,18 +103,18 @@ def render_legend():
 
 def render():
     legend = render_legend()
-    face_top, face_bot = CENTER - FACE_R, CENTER + FACE_R
-    face_h = face_bot - face_top
     rows = []
     for y in range(HIGH):
         row = []
         for x in range(HIGH):
             if any(x >= x0 and x < x0 + s and y >= y0 and y < y0 + s for x0, y0, s in legend):
-                color = (*LEGEND, 255)  # engraved legend
-            elif in_circle(x, y, CENTER, CENTER, FACE_R):
-                color = (*lerp(FACE_TOP, FACE_BOT, (y - face_top) / face_h), 255)
+                color = (*LEGEND, 255)  # gold lettering on the dark plate
+            elif in_circle(x, y, CENTER, CENTER, PLATE_R):
+                color = (*PLATE, 255)  # dark plate
+            elif in_circle(x, y, CENTER, CENTER, SILVER_R):
+                color = (*SILVER, 255)  # silver inner ring
             elif in_circle(x, y, CENTER, CENTER, DISC_R):
-                color = (*RIM, 255)
+                color = (*GOLD, 255)  # gold rim, out to the canvas edge
             else:
                 color = (0, 0, 0, 0)
             row.append(color)
