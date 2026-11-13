@@ -1,5 +1,37 @@
 # Changelog
 
+## 2026-11-13 — minimap-button-parent-and-size (v0.1.6)
+
+- The v0.1.5 raise fixed the number, not the mechanism, so the mechanism changed: the
+  button is now created on `MinimapCluster` (`parent = MinimapCluster or Minimap`)
+  instead of `Minimap`. A child of `Minimap` cannot outrank the ring by frame level at
+  all — the ring is `MinimapCompassTexture` (`atlas="ui-hud-minimap-frame"`) on the
+  frame `MinimapBackdrop` (`Blizzard_Minimap/Mainline/Minimap.xml:219-238`); the 175x16
+  `BorderTop` the old comment cited is Minimap.xml:18-25, the header plate, not the ring
+  — because levels only rank frames inside one stratum. `RaiseAboveBorder` is now the
+  one place the frame's level is set, taking `parent:GetFrameLevel() + 10` and copying
+  `parent:GetFrameStrata()` (Blizzard's own recipe for the cluster's over-the-border
+  ornament `InstanceDifficulty`, `MinimapClusterMixin:OnLoad`,
+  `Blizzard_Minimap/Mainline/Minimap.lua:373-374`), called from `CreateButton` and
+  re-applied on `PLAYER_ENTERING_WORLD` and `UI_SCALE_CHANGED`, when the client restamps
+  cluster levels and rebuilds the cluster layout.
+- `RingGeometry` converts minimap space with the button's own effective scale (the ratio
+  `SavePosition` already used) instead of assuming the frame's space is `UIParent`'s,
+  which stopped being true as soon as the frame moved parents; `SetClampedToScreen(true)`
+  and the v0.1.4 ring/drag behaviour (one angle → point helper, the angle in
+  `QuickBindsDB.minimapButton`, `/qbcenter`) are unchanged.
+- `SIZE` 32 → **24**, derived in the comment next to the constant from the requester's
+  screenshot: the neighbouring buttons render 27 px wide at their ~1.1 UI scale (the
+  198-unit `Minimap` frame draws as the 215 px terrain circle in the same image), so a
+  neighbour is 24 units — 0.75× the old frame. The art is an inscribed disc that scales
+  to any frame size, so `Media/icon.tga` is untouched.
+- Tooling: `tools/check-drag.mjs` grew the v0.1.6 frame rules — parent expression,
+  parent-derived `+ 10` level, stratum copy, the two re-apply events and the exact
+  `SetSize` value (asserted as `24`, not "a call containing a number"), every new
+  assertion proven red by mutation against the shipped file and green after;
+  `SetFrameStrata`, `GetFrameStrata`, `UI_SCALE_CHANGED` and `PLAYER_ENTERING_WORLD`
+  joined the `check-apis.mjs` name list.
+
 ## 2026-11-13 — minimap-button-frame-level-and-art (v0.1.5)
 
 - The button now renders above the minimap border instead of underneath it: the disc
