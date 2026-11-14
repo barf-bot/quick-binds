@@ -12,8 +12,10 @@
 // in QuickBindsDB.minimapButton instead of the free x/y pair v0.1.1 stored.
 //
 // v0.1.6 adds the frame-construction rules the client's v0.1.5 report taught: the
-// button's parent, its frame level and stratum, when the level is re-applied, and its
-// size (see the v0.1.6 section below for the FrameXML evidence behind each one).
+// button's parent, its frame level and stratum, when the level is re-applied and its
+// size; v0.1.7 moves the parent back to `Minimap`, names the source the rank comes from
+// and pins the scale conversions (see the v0.1.6/v0.1.7 section below for the FrameXML
+// evidence behind each rule).
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -159,23 +161,45 @@ function* savedFields(node) {
   }
 }
 
-// --- v0.1.6: the button's parent, level and size -----------------------------------
+// --- v0.1.6 + v0.1.7: parent, raise source, size and coordinate space --------------
 //
 // Why the v0.1.5 raise did nothing in-game: the round bronze ring is
 // `MinimapCompassTexture` (`atlas="ui-hud-minimap-frame"`) on the frame
 // `MinimapBackdrop` (Blizzard_Minimap/Mainline/Minimap.xml:219-238) — the 175x16
 // `BorderTop` that comment cited is Minimap.xml:18-25, a header plate, not the ring —
-// and a frame parented to `Minimap` cannot outrank that art by frame level alone,
-// because levels only rank frames inside one stratum. Blizzard's own over-the-border
-// ornament (`InstanceDifficulty`) is a child of `MinimapCluster`, raised with
+// and a level only ranks frames inside one stratum, so v0.1.5's SetFrameLevel left the
+// button under that art. Blizzard's own over-the-border ornament (`InstanceDifficulty`)
+// is a child of `MinimapCluster`, raised with
 // `local raisedFrameLevel = self:GetFrameLevel() + 10;`
 // `self.InstanceDifficulty:SetFrameLevel(raisedFrameLevel)`
-// (MinimapClusterMixin:OnLoad, Blizzard_Minimap/Mainline/Minimap.lua:373-374), so the
-// button has to join that parent, copy that stratum and re-apply that level on
-// `PLAYER_ENTERING_WORLD` and `UI_SCALE_CHANGED` — the client restamps cluster levels
-// after `ADDON_LOADED`, so a level set only at creation is not enough.
+// (MinimapClusterMixin:OnLoad, Blizzard_Minimap/Mainline/Minimap.lua:373-374), and the
+// client restamps cluster levels after `ADDON_LOADED` — hence the
+// `PLAYER_ENTERING_WORLD` / `UI_SCALE_CHANGED` re-apply both versions keep. v0.1.6 added
+// the stratum copy, and the button finally drew over the ring.
 //
-// The size rule is the other half of the same report: the two neighbouring addon
+// What v0.1.6 broke by taking the parent from the same expression: `MinimapCluster`
+// inherits `ResizeLayoutFrame` (Blizzard_Minimap/Mainline/Minimap.xml:3), so the cluster
+// resizes itself to fit its children. Two captures of the same screen at the same
+// 578x434 resolution, QuickBinds off versus QuickBinds v0.1.6, show it — the minimap's
+// edit-mode frame went from x 249..450 (201 px wide) to x 124..450 (326 px wide):
+// identical right and bottom edges, with the button's 125 px of left overhang absorbed
+// into the frame. Every other addon button is a child of `Minimap` and leaves those
+// bounds alone (in the "off" capture they stick out past the frame's right edge), so
+// v0.1.7 parents to `Minimap` and reads the level and stratum from a named `raiseSource`
+// instead of from the parent — home and rank decoupled, which is the pairing that both
+// clears the ring and keeps the cluster's size.
+//
+// The second v0.1.6 regression is arithmetic. `SetPoint("CENTER", UIParent, ...)` reads
+// UIParent units, so the ring has to convert through
+// `Minimap:GetEffectiveScale() / UIParent:GetEffectiveScale()` and a dragged position
+// through `button:GetEffectiveScale() / UIParent:GetEffectiveScale()`, exactly as v0.1.5
+// did. v0.1.6 divided by `button:GetEffectiveScale()` in RingGeometry and dropped the
+// conversion in SavePosition, which scales the whole position vector away from UIParent's
+// origin (~2.2x on that screen) and parks the button far outside the ring — the extra
+// width the cluster then grew to cover. The three geometry rules below pin both ratios
+// and the anchor, so a reformat cannot quietly change the space the maths speaks.
+//
+// The size rule is the other half of the v0.1.6 report: the two neighbouring addon
 // buttons measure 27 px on the player's ~1.1 UI-scale screen (their 198-unit `Minimap`
 // frame renders as the 215 px terrain circle), so 24 units — 0.75× the 32-unit frame
 // v0.1.4 and v0.1.5 shipped with.
@@ -187,7 +211,16 @@ const BUTTON_FRAME_NAME = "QuickBindsMinimapButton";
 const BUTTON_SIZE_UNITS = 24;
 const RAISE_LEVEL = 10;
 const RAISE_EVENTS = ["PLAYER_ENTERING_WORLD", "UI_SCALE_CHANGED"];
-const CLUSTER_PARENT = "MinimapCluster or Minimap";
+// v0.1.7 splits what v0.1.6 had in one expression: the frame's home is `Minimap` (a plain
+// 198x198 frame, never a layout frame), and its rank is read from `raiseSource`.
+const MINIMAP_FRAME = "Minimap";
+const BUTTON_PARENT = MINIMAP_FRAME;
+const RAISE_SOURCE_LOCAL = "raiseSource";
+const RAISE_SOURCE = "MinimapCluster or Minimap";
+// The space SetPoint reads, and the two conversions into it: the minimap's scale for the
+// ring maths, the frame's own scale for the position a drag leaves behind.
+const UIPARENT_FRAME = "UIParent";
+const RING_SCALE_RATIO = `${MINIMAP_FRAME}:GetEffectiveScale() / ${UIPARENT_FRAME}:GetEffectiveScale()`;
 
 // A node's exact source text, or null when it carries no range.
 function rawText(source, node) {
@@ -271,8 +304,33 @@ function spellings(source, assigns, node, seen = new Set()) {
   return out;
 }
 
+// Every node of a type inside a subtree — how a rule reads an expression written
+// anywhere in a function body instead of only the top line of it.
+function* nodesOfType(node, type) {
+  if (!node || typeof node !== "object") return;
+  if (Array.isArray(node)) {
+    for (const child of node) yield* nodesOfType(child, type);
+    return;
+  }
+  if (node.type === type) yield node;
+  for (const key of Object.keys(node)) {
+    if (key !== "range" && key !== "loc") yield* nodesOfType(node[key], type);
+  }
+}
+
+// Normalized spellings of every division (`a / b`) in a function body, each expanded
+// through the assignment map so `local ratio = a / b` and an inline `a / b` compare equal.
+function divisionSpellings(source, assigns, fn) {
+  const out = new Set();
+  for (const node of nodesOfType(fn, "BinaryExpression")) {
+    if (node.operator !== "/") continue;
+    for (const spelling of spellings(source, assigns, node)) out.add(spelling);
+  }
+  return out;
+}
+
 // The frames the file stores in a variable: `button = CreateFrame("Button",
-// "QuickBindsMinimapButton", parent)` → { name, frameType, parent }.
+// "QuickBindsMinimapButton", Minimap)` → { name, frameType, parent }.
 function frameSetups(assigns) {
   const out = [];
   for (const [name, inits] of assigns) {
@@ -355,7 +413,7 @@ function eventsHandled(ast, defs) {
   return out;
 }
 
-// The v0.1.6 rules for the file that builds the button; other files (Core.lua)
+// The v0.1.6/v0.1.7 rules for the file that builds the button; other files (Core.lua)
 // contribute nothing. Each rule prints its own line, so one breakage per mutation.
 function checkFrameSetup(file, source, ast, defs) {
   const assigns = assignmentMap(ast);
@@ -375,14 +433,29 @@ function checkFrameSetup(file, source, ast, defs) {
     lines.push(`${ok ? "OK   " : "FAIL "}QuickBinds/${file}: ${message}`);
 
   for (const frame of frames) {
+    // The home: `Minimap` in v0.1.7. The argument's own text, or, when the code names a
+    // local, the value the file assigns it (`parent` → `MinimapCluster or Minimap`).
     const parentSpells = spellings(source, assigns, frame.parent);
     const parentText = rawText(source, frame.parent) ?? "nothing";
-    const parentOk = parentSpells.has(norm(CLUSTER_PARENT));
-    const parentLevel = `\`${parentText}:GetFrameLevel() + ${RAISE_LEVEL}\``;
-    // What the frame is really parented to: the argument's own text, or, when the code
-    // names a local, the value the file assigns it (`parent` → `Minimap`).
+    const parentOk = parentSpells.has(norm(BUTTON_PARENT));
     const aliased = [...parentSpells].filter((spelling) => spelling !== norm(parentText));
     const parentShown = parentOk || aliased.length === 0 ? parentText : aliased.join(" | ");
+
+    // The rank: v0.1.7 reads it from `raiseSource` instead of from the parent, so the
+    // frame's home and its level are decoupled (see the section comment above).
+    const raiseInits = assigns.get(RAISE_SOURCE_LOCAL) ?? [];
+    const raiseSpells = new Set(
+      raiseInits.flatMap((init) => [...spellings(source, assigns, init)]),
+    );
+    const raiseDeclared = raiseInits.length > 0;
+    const raiseOk = raiseSpells.has(norm(RAISE_SOURCE));
+    // The exact text the file gives the local; when the file has no such local the rule's
+    // own value is named instead, so `SetFrameLevel` can say what it is missing.
+    const raiseText =
+      raiseInits.map((init) => rawText(source, init)).filter(Boolean).join(" | ") ||
+      RAISE_SOURCE;
+    const raiseLevel = `\`${raiseText}:GetFrameLevel() + ${RAISE_LEVEL}\``;
+    const raiseStrata = `\`${raiseText}:GetFrameStrata()\``;
 
     say(
       frame.frameType === "Button",
@@ -395,47 +468,74 @@ function checkFrameSetup(file, source, ast, defs) {
     say(
       parentOk,
       parentOk
-        ? `${frame.name} is parented to \`${parentText}\` — MinimapCluster with the Minimap ` +
-          "fallback, the frame the ring art belongs to"
-        : `${frame.name} is parented to \`${parentShown}\`, not \`${CLUSTER_PARENT}\` — a ` +
-          "child of Minimap renders under MinimapCompassTexture whatever level it sets",
+        ? `${frame.name} is parented to \`${parentShown}\` — a child of Minimap, the frame ` +
+          "every other addon button shares and the only one that cannot resize the cluster"
+        : `${frame.name} is parented to \`${parentShown}\`, not \`${BUTTON_PARENT}\` — ` +
+          "MinimapCluster inherits ResizeLayoutFrame (Blizzard_Minimap/Mainline/Minimap.xml:3) " +
+          "and resizes itself to fit its children: the v0.1.6 stretched-minimap regression",
     );
 
-    const wantedLevel = new Set(
-      [...parentSpells].map((p) => norm(`${p}:GetFrameLevel() + ${RAISE_LEVEL}`)),
+    say(
+      raiseOk,
+      raiseOk
+        ? `${RAISE_SOURCE_LOCAL} is \`${raiseText}\` — the level and stratum come from the ` +
+          `cluster by name while the home stays \`${BUTTON_PARENT}\`, so the two are decoupled`
+        : raiseDeclared
+          ? `the file assigns \`${raiseText}\` to \`${RAISE_SOURCE_LOCAL}\`, not ` +
+            `\`${RAISE_SOURCE}\` — the raise has to read the cluster's own level and stratum`
+          : `\`${RAISE_SOURCE_LOCAL}\` is never assigned — v0.1.6 read the rank off the frame's ` +
+            `own parent, so the parent had to be \`${RAISE_SOURCE}\`; v0.1.7 names ` +
+            `\`${RAISE_SOURCE}\` separately and parents to \`${BUTTON_PARENT}\``,
     );
+
+    const wantedLevel = new Set([...raiseSpells].map((p) => norm(`${p}:GetFrameLevel() + ${RAISE_LEVEL}`)));
     const levelSets = callsOn(allCalls, frame.name, "SetFrameLevel").map((call) =>
       firstArgSpells(source, assigns, call),
     );
-    const levelOk = levelSets.some((set) => [...set].some((spelling) => wantedLevel.has(spelling)));
+    const levelSpells = levelSets.map((set) => spellingText(set)).join(", ");
+    const levelOk =
+      raiseOk && levelSets.some((set) => [...set].some((spelling) => wantedLevel.has(spelling)));
     say(
       levelOk,
       levelOk
-        ? `${frame.name}:SetFrameLevel(...) is the parent-derived ${parentLevel} raise — ` +
-          "Blizzard's own recipe for clearing the cluster's border art"
+        ? `${frame.name}:SetFrameLevel(...) is the ${RAISE_SOURCE_LOCAL}-derived ${raiseLevel} ` +
+          "raise — Blizzard's own recipe for clearing the cluster's border art"
         : levelSets.length === 0
-          ? `${frame.name} never calls SetFrameLevel — the frame needs ${parentLevel} to sit ` +
+          ? `${frame.name} never calls SetFrameLevel — the frame needs ${raiseLevel} to sit ` +
             "above the ring art"
-          : `${frame.name}:SetFrameLevel(${levelSets.map((set) => spellingText(set)).join(", ")}) ` +
-            `is not ${parentLevel}: a level only ranks frames inside the stratum the border ` +
-            "art is drawn in",
+          : raiseDeclared
+            ? `${frame.name}:SetFrameLevel(${levelSpells}) is not ${raiseLevel}: a level only ` +
+              "ranks frames inside the stratum the border art is drawn in"
+            : `${frame.name}:SetFrameLevel(${levelSpells}) has no ${RAISE_SOURCE_LOCAL} to read ` +
+              `${raiseLevel} from — the frame needs the cluster's level, not the minimap's`,
     );
 
-    const wantedStrata = new Set([...parentSpells].map((p) => norm(`${p}:GetFrameStrata()`)));
+    // `SetFrameStrata(raiseSource:GetFrameStrata())` reaches the source two ways through
+    // `spellings`: the normalized member form and the call form a CallExpression adds, so
+    // the rule accepts both (`SetFrameLevel(x:GetFrameLevel() + 10)` only ever yields the
+    // first, because there the member sits inside a binary expression).
+    const wantedStrata = new Set(
+      [...raiseSpells].flatMap((p) => [norm(`${p}:GetFrameStrata()`), `${p}:GetFrameStrata()`]),
+    );
     const strataSets = callsOn(allCalls, frame.name, "SetFrameStrata").map((call) =>
       firstArgSpells(source, assigns, call),
     );
-    const strataOk = strataSets.some((set) => [...set].some((spelling) => wantedStrata.has(spelling)));
+    const strataSpells = strataSets.map((set) => spellingText(set)).join(", ");
+    const strataOk =
+      raiseOk &&
+      strataSets.some((set) => [...set].some((spelling) => wantedStrata.has(spelling)));
     say(
       strataOk,
       strataOk
-        ? `${frame.name}:SetFrameStrata(...) copies \`${parentText}:GetFrameStrata()\`, so the ` +
-          "level is compared in the same stratum as the border art"
+        ? `${frame.name}:SetFrameStrata(...) copies ${raiseStrata}, so the level is compared ` +
+          "in the same stratum as the border art"
         : strataSets.length === 0
           ? `${frame.name} never calls SetFrameStrata — a level only ranks frames inside one ` +
-            "stratum, so the frame has to join the parent's"
-          : `${frame.name}:SetFrameStrata(${strataSets.map((set) => spellingText(set)).join(", ")}) ` +
-            `is not the parent's own stratum (\`${parentText}:GetFrameStrata()\`)`,
+            `stratum, so the frame has to join ${raiseStrata}`
+          : raiseDeclared
+            ? `${frame.name}:SetFrameStrata(${strataSpells}) is not ${raiseStrata}`
+            : `${frame.name}:SetFrameStrata(${strataSpells}) has no ${RAISE_SOURCE_LOCAL} to ` +
+              `copy ${raiseStrata} from`,
     );
 
     const sizeSets = callsOn(allCalls, frame.name, "SetSize").map((call) =>
@@ -466,13 +566,67 @@ function checkFrameSetup(file, source, ast, defs) {
         registered && reapplied,
         registered && reapplied
           ? `${frame.name} is re-raised for ${event} — registered, and the branch that handles ` +
-            "it re-applies the parent-derived level"
+            `it re-applies the ${RAISE_SOURCE_LOCAL}-derived level`
           : !registered
             ? `${event} is never registered — the client restamps cluster levels after ` +
               "ADDON_LOADED, so the raise has to be re-applied by a frame that listens for it"
             : `${event} is registered, but the branch handling it never reaches ` +
               `\`${frame.name}:SetFrameLevel(...)\` — a level set at creation only loses to the ` +
               "client's restamp",
+      );
+    }
+
+    // The v0.1.7 geometry rules: every coordinate the frame is placed with goes through
+    // the conversion into UIParent units — the space SetPoint reads — both the ring's and
+    // the one a drag leaves behind. v0.1.6 divided by the button's own scale in
+    // RingGeometry and dropped the conversion in SavePosition entirely.
+    const ring = defs.get("RingGeometry");
+    if (ring) {
+      const ratios = divisionSpellings(source, assigns, ring);
+      const ok = ratios.has(norm(RING_SCALE_RATIO));
+      say(
+        ok,
+        ok
+          ? `RingGeometry() converts the minimap through \`${RING_SCALE_RATIO}\` — the space ` +
+            "SetPoint reads, and the only denominator that keeps the ring on the minimap"
+          : `RingGeometry() converts through ${spellingText(ratios) || "no scale ratio"} — ` +
+            `SetPoint("CENTER", ${UIPARENT_FRAME}, ...) needs \`${RING_SCALE_RATIO}\``,
+      );
+    }
+
+    const save = defs.get("SavePosition");
+    if (save) {
+      const centerRatio = `${frame.name}:GetEffectiveScale() / ${UIPARENT_FRAME}:GetEffectiveScale()`;
+      const ratios = divisionSpellings(source, assigns, save);
+      const ok = ratios.has(norm(centerRatio));
+      say(
+        ok,
+        ok
+          ? `SavePosition() converts \`${frame.name}:GetCenter()\` through \`${centerRatio}\`, ` +
+            "so the angle it saves is measured in the space the anchor is set in"
+          : `SavePosition() converts \`${frame.name}:GetCenter()\` through ` +
+            `${spellingText(ratios) || "no scale ratio"} — it needs \`${centerRatio}\``,
+      );
+    }
+
+    const apply = defs.get("ApplyAngle");
+    if (apply) {
+      const anchored = [...calls(apply)].some((call) => {
+        const args = call.arguments ?? [];
+        return (
+          methodName(call) === "SetPoint" &&
+          isStringArg(args[0], "CENTER") &&
+          isStringArg(args[2], "BOTTOMLEFT") &&
+          spellings(source, assigns, args[1] ?? {}).has(norm(UIPARENT_FRAME))
+        );
+      });
+      say(
+        anchored,
+        anchored
+          ? `ApplyAngle() anchors \`CENTER\` on \`${UIPARENT_FRAME}\`/\`BOTTOMLEFT\`, the corner ` +
+            "those converted coordinates are measured from"
+          : `ApplyAngle() never anchors \`CENTER\` on \`${UIPARENT_FRAME}\`/\`BOTTOMLEFT\` — the ` +
+            "ring maths produces UIParent units, so the anchor has to be that corner",
       );
     }
   }
@@ -604,5 +758,5 @@ if (failed) {
 }
 console.log(
   `check-drag: ${files.length} file(s) checked, dragged frames declared movable and ` +
-    "pinned to the minimap ring, the button parented, raised and sized as v0.1.6 measures it",
+    "pinned to the minimap ring, the button parented, raised and sized as v0.1.7 measures it",
 );

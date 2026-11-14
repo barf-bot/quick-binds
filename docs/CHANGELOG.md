@@ -1,5 +1,35 @@
 # Changelog
 
+## 2026-11-14 — minimap-button-parent-and-anchor-maths (v0.1.7)
+
+- v0.1.6's raise worked and cost the layout: `MinimapCluster` inherits `ResizeLayoutFrame`
+  (`Blizzard_Minimap/Mainline/Minimap.xml:3`), so it resizes itself to fit every child.
+  Two captures of the same screen at the same 578x434 resolution, QuickBinds off versus
+  v0.1.6, show the minimap's edit-mode frame going from x 249..450 (201 px wide) to
+  x 124..450 (326 px wide) — identical right and bottom edges, with the button's 125 px of
+  left overhang absorbed by the cluster, while every other addon button (a child of
+  `Minimap`) leaves those bounds alone. `CreateButton` parents the button to `Minimap`
+  again and takes the rank v0.1.6 won from a named source instead of from the parent
+  (`local raiseSource = MinimapCluster or Minimap;` feeding `SetFrameStrata` and
+  `SetFrameLevel(raiseSource:GetFrameLevel() + 10)`, still re-applied on
+  `PLAYER_ENTERING_WORLD` and `UI_SCALE_CHANGED`): home and rank are decoupled, so
+  clearing the bronze ring no longer means joining the layout frame that stretches.
+- The second v0.1.6 regression was the anchor maths. `SetPoint("CENTER", UIParent, ...)`
+  reads UIParent units, and v0.1.6's `RingGeometry` divided by `button:GetEffectiveScale()`
+  instead of `UIParent:GetEffectiveScale()` — scaling the whole position vector ~2.2x away
+  from that origin on that screen and parking the button far outside the ring, which is
+  the ground the cluster then grew to cover. `RingGeometry` and `SavePosition` are
+  v0.1.5's conversions again (`Minimap:GetEffectiveScale() / UIParent:GetEffectiveScale()`
+  and `button:GetEffectiveScale() / UIParent:GetEffectiveScale()`); `SIZE = 24`,
+  `SetClampedToScreen(true)` and `Media/icon.tga` are untouched.
+- Tooling: `tools/check-drag.mjs` pins the new shape — parent `Minimap`, the level and
+  stratum read through `raiseSource`, and three geometry rules for the two scale ratios
+  and the `UIParent`/`BOTTOMLEFT` anchor, with every v0.1.6 assertion kept. The changed
+  rules were run red against the shipped v0.1.6 file (six failures), green after, and
+  re-proven red by seven mutations of the new file (parent, raise-source value, each
+  ratio, the anchor, `SetMovable`, `SetFrameStrata`). `check-apis.mjs` needed no new
+  names; `bash tools/package.sh` builds `dist/QuickBinds-v0.1.7.zip`.
+
 ## 2026-11-13 — minimap-button-parent-and-size (v0.1.6)
 
 - The v0.1.5 raise fixed the number, not the mechanism, so the mechanism changed: the
